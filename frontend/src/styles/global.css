@@ -578,3 +578,18 @@ table.data-table tbody tr:hover {
 .app-header .app-title { font-size: 18px; }
 @media (max-width: 850px) { .app-header { gap: 16px; flex-wrap: wrap; } .app-header .spacer { display: none; } .user-chip { margin-left: auto; } }
 @media (max-width: 600px) { main.app-main { padding: 18px 14px 48px; } .app-header { padding: 14px; } .app-header nav { order: 3; width: 100%; } .user-chip { align-items: flex-start; font-size: 12px; margin-left: 0; } .card { padding: 16px; } .page-head { gap: 10px; } }
+
+/* Detail data must wrap inside its grid track, including long names and URLs. */
+.field-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 4px 16px; align-items: start; padding: 7px 0; border-top: 1px solid var(--color-border); }
+.field-row > div { min-width: 0; overflow-wrap: anywhere; }
+.field-row .chip, .field-row .msel-chip { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.audit-panel { min-width: 0; overflow-wrap: anywhere; }
+.audit-grid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 6px 12px; font-size: 12.5px; margin-top: 6px; }
+.audit-grid > * { min-width: 0; overflow-wrap: anywhere; }
+.audit-change { border: 1px solid var(--color-border); border-radius: 6px; background: #f8fafb; }
+.audit-change > summary { padding: 10px 12px; color: #005776; font-weight: 600; cursor: pointer; }
+.audit-snapshots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 12px 12px; }
+.audit-snapshots section { min-width: 0; }
+.audit-snapshots h3 { font-size: 12px; margin: 8px 0; color: #005776; }
+.audit-snapshots pre, .audit-value { margin: 0; padding: 12px; background: white; border: 1px solid var(--color-border); border-radius: 4px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; tab-size: 2; }
+@media (max-width: 700px) { .field-row { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 12px 0; } .audit-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; } .audit-grid > .muted:not(:first-child) { margin-top: 10px; } .audit-snapshots { grid-template-columns: minmax(0, 1fr); } }

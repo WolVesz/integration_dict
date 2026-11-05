@@ -1,6 +1,7 @@
 name: Verify application and release bundle
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -8,6 +9,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.11', '3.12']
     env:

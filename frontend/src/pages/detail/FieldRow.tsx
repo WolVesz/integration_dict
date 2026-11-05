@@ -341,17 +341,7 @@ export default function FieldRow({ def, detail, editing, draft, set, options, er
   const locked = editing && !canEdit
 
   return (
-    <div
-      className="field-row"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '200px 1fr',
-        gap: '4px 16px',
-        alignItems: 'start',
-        padding: '7px 0',
-        borderTop: '1px solid var(--color-border)',
-      }}
-    >
+    <div className="field-row">
       <div style={{ paddingTop: editing ? 8 : 0 }}>
         {editing ? <label htmlFor={controlId}>{def.label}</label> : (
           <span style={{ fontWeight: 600, color: 'var(--ts-slate)' }}>{def.label}</span>
@@ -382,3 +372,4 @@ export default function FieldRow({ def, detail, editing, draft, set, options, er
     </div>
   )
 }
+
