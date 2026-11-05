@@ -1,18 +1,25 @@
-# Databricks Apps entrypoint. The runtime injects UVICORN_HOST=0.0.0.0 and
-# UVICORN_PORT=$DATABRICKS_APP_PORT, so uvicorn needs no host/port flags.
+# Databricks Apps injects UVICORN_HOST and UVICORN_PORT.
+# This file deliberately contains no workspace, app name, database, or secrets.
 command: ["uvicorn", "backend.main:app"]
 
 env:
-  # Entra/Databricks group(s) whose members get the integration (admin) role.
-  - name: "ADMIN_GROUPS"
-    value: "integration-admins"
+  - name: "DEV_MODE"
+    value: "false"
+  - name: "PYTHONDONTWRITEBYTECODE"
+    value: "1"
+  - name: "APP_NAME"
+    value: "Platte River Power Authority Integration Dictionary"
 
-  # AI search: add a model serving endpoint resource to the app (resource key
-  # "serving-endpoint", permission "Can query") and uncomment:
+  # Set ADMIN_GROUPS to verified groups assigned to the target workspace.
+  # Do not assume the local-development example is a production group.
+  # - name: "ADMIN_GROUPS"
+  #   value: "<verified-admin-group>"
+
+  # Attach the existing approved Lakebase database resource and configure its
+  # actual instance name. PGHOST/PGPORT/PGUSER/PGDATABASE come from that resource.
+  # - name: "LAKEBASE_INSTANCE_NAME"
+  #   value: "<approved-existing-instance>"
+
+  # Optional: attach an approved serving endpoint with Can query permission.
   # - name: "EMBEDDING_ENDPOINT"
   #   valueFrom: "serving-endpoint"
-
-  # Lakebase: add a database resource to the app (resource key "database",
-  # permission "Can connect and create") and set your instance name:
-  # - name: "LAKEBASE_INSTANCE_NAME"
-  #   value: "integration-dict-db"

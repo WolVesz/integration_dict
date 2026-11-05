@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from . import audit
 from .config import get_settings
-from .models import Integration, utcnow
+from .models import Integration, IntegrationFrameworkProfile, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,27 @@ def build_search_document(db: Session, i: Integration) -> str:
         parts.append(i.created_by.email)
     if i.updated_by:
         parts.append(i.updated_by.email)
+    # Explicit allowlist: secret references, URLs and freeform operational text
+    # do not enter the keyword document or external embedding request.
+    profile = db.get(IntegrationFrameworkProfile, i.id)
+    if profile:
+        parts.append(profile.stage)
+        for section, names in {
+            'ownership': ('business_owner', 'technical_owner', 'support_team', 'criticality', 'data_classification'),
+            'contract': ('api_version', 'openapi_version', 'auth_scheme', 'data_entities'),
+            'orchestration': ('workflow_type', 'workflow_id_template', 'trigger'),
+        }.items():
+            values = profile.spec.get(section, {})
+            for name in names:
+                value = values.get(name)
+                if isinstance(value, list):
+                    parts.extend(str(v) for v in value)
+                elif value:
+                    parts.append(str(value))
+        for environment in profile.spec.get('environments', []):
+            for name in ('name', 'apim_service', 'apim_api_id', 'temporal_namespace', 'task_queue', 'worker_deployment', 'release_version'):
+                if environment.get(name):
+                    parts.append(str(environment[name]))
     return " | ".join(parts).lower()
 
 
@@ -234,3 +255,4 @@ def reindex(db: Session) -> tuple[int, int]:
                 indexed += 1
         db.commit()
     return indexed, failed
+

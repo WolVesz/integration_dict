@@ -351,3 +351,35 @@ class CommentAttachment(Base):
     # serving endpoint loads it on demand when .data is accessed.
     data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+
+class IntegrationFrameworkProfile(Base):
+    """Additive registry profile with an independent optimistic-lock version."""
+    __tablename__ = "integration_framework_profiles"
+    __table_args__ = (CheckConstraint("version >= 1", name="ck_framework_version"),)
+
+    integration_id: Mapped[str] = mapped_column(ForeignKey("integrations.id"), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    stage: Mapped[str] = mapped_column(String(20), nullable=False, default="discovery")
+    spec: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_by: Mapped[str] = mapped_column(String(320), nullable=False)
+
+
+class IntegrationReleasePlan(Base):
+    """Append-only planning evidence. Not a deployment record or runtime command."""
+    __tablename__ = "integration_release_plans"
+    __table_args__ = (Index("ix_release_plan_integration_time", "integration_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    integration_id: Mapped[str] = mapped_column(ForeignKey("integrations.id"), index=True)
+    profile_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    environment: Mapped[str] = mapped_column(String(10), nullable=False)
+    release_version: Mapped[str] = mapped_column(String(200), nullable=False)
+    git_sha: Mapped[str] = mapped_column(String(40), nullable=False)
+    spec_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(320), nullable=False)
+    reason: Mapped[str] = mapped_column(String(2000), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned")

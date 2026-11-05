@@ -567,3 +567,14 @@ table.data-table tbody tr:hover {
   padding: 10px 14px;
   margin: 10px 0;
 }
+
+
+/* PRPA application identity: textual brand, original integration icon. */
+.brand-home { display: flex; align-items: center; gap: 12px; text-decoration: none; flex-shrink: 0; }
+.brand-copy { display: flex; flex-direction: column; gap: 4px; }
+.brand-organization { font-size: 11px; color: #005776; font-weight: 700; letter-spacing: .02em; }
+.app-header { padding-top: 16px; padding-bottom: 16px; border-bottom-color: #008AD8; }
+.app-header .logo { height: 44px; width: 44px; }
+.app-header .app-title { font-size: 18px; }
+@media (max-width: 850px) { .app-header { gap: 16px; flex-wrap: wrap; } .app-header .spacer { display: none; } .user-chip { margin-left: auto; } }
+@media (max-width: 600px) { main.app-main { padding: 18px 14px 48px; } .app-header { padding: 14px; } .app-header nav { order: 3; width: 100%; } .user-chip { align-items: flex-start; font-size: 12px; margin-left: 0; } .card { padding: 16px; } .page-head { gap: 10px; } }

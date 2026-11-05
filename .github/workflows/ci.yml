@@ -1,0 +1,87 @@
+name: Verify application and release bundle
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    env:
+      DEV_MODE: 'true'
+      DATABASE_URL: sqlite:////tmp/integration-dict-ci.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            constraints.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest backend/tests scripts/tests -q
+      - run: npm ci && npm run typecheck && npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium && npm run test:e2e
+        working-directory: frontend
+      - name: Verify explicit migration and production guard
+        run: |
+          python -c 'from backend.database import engine; from backend.models import Base; from scripts.db_checks import FRAMEWORK_TABLES; Base.metadata.create_all(engine, tables=[t for n,t in Base.metadata.tables.items() if n not in FRAMEWORK_TABLES])'
+          python -m scripts.migrate_framework --expected-database /tmp/integration-dict-ci.db --expected-schema main
+          python -m scripts.migrate_framework --expected-database /tmp/integration-dict-ci.db --expected-schema main --apply
+          python -m scripts.migrate_framework --expected-database /tmp/integration-dict-ci.db --expected-schema main --apply
+          python -m scripts.preflight --expected-database /tmp/integration-dict-ci.db --expected-schema main
+          if python -m scripts.preflight --expected-database /tmp/integration-dict-ci.db --expected-schema main --production; then exit 1; fi
+      - name: Package deterministically with built frontend
+        run: |
+          python -m scripts.package_release --output /tmp/integration-dict-release.tar
+          python -m scripts.package_release --output /tmp/integration-dict-release-repeat.tar
+          cmp /tmp/integration-dict-release.tar /tmp/integration-dict-release-repeat.tar
+          tar tf /tmp/integration-dict-release.tar | grep '^frontend/dist/index.html$'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integration-dict-python-${{ matrix.python-version }}
+          path: /tmp/integration-dict-release.tar
+          retention-days: 14
+  postgres-schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: catalog_ci
+          POSTGRES_PASSWORD: ci-only-not-production
+          POSTGRES_DB: catalog_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U catalog_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DEV_MODE: 'false'
+      DATABASE_URL: postgresql+psycopg2://catalog_ci:ci-only-not-production@localhost:5432/catalog_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Bootstrap an isolated PostgreSQL schema, then verify additive no-op
+        run: |
+          python -m scripts.bootstrap_database --production --expected-database catalog_ci --expected-schema public
+          python -m scripts.bootstrap_database --production --expected-database catalog_ci --expected-schema public --apply
+          if python -m scripts.bootstrap_database --production --expected-database catalog_ci --expected-schema public --apply; then exit 1; fi
+          python -m scripts.migrate_framework --production --expected-database catalog_ci --expected-schema public --apply
+          python -c 'from backend.database import engine; from backend.models import Base; from scripts.db_checks import schema_problems; c = engine.connect(); assert not schema_problems(c, Base.metadata, Base.metadata.tables); c.close()'

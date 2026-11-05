@@ -26,19 +26,17 @@ function extractDetail(body: unknown): { detail: string; fields?: string[] } {
   if (body && typeof body === 'object') {
     const d = (body as Record<string, unknown>).detail
     if (typeof d === 'string') return { detail: d }
-    if (d && typeof d === 'object') {
+    if (Array.isArray(d)) {
+      const first = d[0] as { msg?: string; loc?: unknown[] } | undefined
+      if (first?.msg) {
+        const loc = Array.isArray(first.loc) ? first.loc.filter(part => part !== 'body').join('.') : ''
+        return { detail: `${loc ? `${loc}: ` : ''}${first.msg}` }
+      }
+    } else if (d && typeof d === 'object') {
       const obj = d as Record<string, unknown>
       return {
         detail: typeof obj.detail === 'string' ? obj.detail : JSON.stringify(d),
         fields: Array.isArray(obj.fields) ? (obj.fields as string[]) : undefined,
-      }
-    }
-    if (Array.isArray(d)) {
-      // FastAPI validation errors
-      const first = d[0] as { msg?: string; loc?: unknown[] } | undefined
-      if (first?.msg) {
-        const loc = Array.isArray(first.loc) ? first.loc[first.loc.length - 1] : ''
-        return { detail: `${String(loc)}: ${first.msg}` }
       }
     }
   }
@@ -100,3 +98,4 @@ export const patch = <T>(path: string, body: unknown) =>
   request<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
 
 export const del = <T>(path: string) => request<T>(path, { method: 'DELETE' })
+
