@@ -80,6 +80,7 @@ export default function FrameworkPanel({ integrationId, onDirtyChange, onEditing
     try {
       const p = await getFramework(integrationId)
       setProfile(p); setDraft(p.spec); setEditing(false); setConflict(false); setError(null); setConfirmReload(false)
+      await onUpdated()
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not reload framework.') }
     finally { setBusy(false) }
   }

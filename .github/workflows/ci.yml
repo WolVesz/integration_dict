@@ -34,6 +34,12 @@ jobs:
         working-directory: frontend
       - run: npx playwright install --with-deps chromium && npm run test:e2e
         working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-python-${{ matrix.python-version }}
+          path: frontend/test-results/
+          retention-days: 7
       - name: Verify explicit migration and production guard
         run: |
           python -c 'from backend.database import engine; from backend.models import Base; from scripts.db_checks import FRAMEWORK_TABLES; Base.metadata.create_all(engine, tables=[t for n,t in Base.metadata.tables.items() if n not in FRAMEWORK_TABLES])'

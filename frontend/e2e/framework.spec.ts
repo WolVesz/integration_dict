@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('framework save synchronizes catalog; dirty navigation and stale edits are safe', async ({ page, request }) => {
+test('framework save synchronizes catalog; dirty navigation and stale edits are safe', async ({ page, request }, testInfo) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const created = await request.post('/api/integrations', { data: { name: `Browser smoke ${Date.now()}` } })
@@ -8,6 +8,8 @@ test('framework save synchronizes catalog; dirty navigation and stale edits are 
   const integration = await created.json()
   const path = `/api/integrations/${integration.id}`
   await page.goto(`/integrations/${integration.id}`)
+  await expect(page.getByRole('button', { name: 'Edit framework', exact: true })).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath('desktop.png'), fullPage: true })
   await page.getByRole('button', { name: 'Edit framework', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeDisabled()
   await page.getByLabel('Business owner', { exact: true }).fill('Synthetic Operations')
@@ -30,11 +32,18 @@ test('framework save synchronizes catalog; dirty navigation and stale edits are 
   expect(external.ok()).toBeTruthy()
   await page.getByRole('button', { name: 'Save framework', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Reload saved profile', exact: true })).toBeVisible()
-  await expect(page.getByLabel('Business owner', { exact: true })).toHaveValue('Unsaved only')
+  // Conflict switches to read-only rendering but retains the local draft for copying.
+  await expect(page.getByText('Unsaved only', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Reload saved profile', exact: true }).click()
   await page.getByRole('button', { name: 'Discard and reload', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Edit framework', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  await page.getByLabel('Description', { exact: true }).fill('Saved after conflict reload')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeEnabled()
+  expect((await (await request.get(path)).json()).description).toBe('Saved after conflict reload')
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
   expect(errors).toEqual([])
 })
