@@ -32,6 +32,7 @@ import CommentsPanel from './CommentsPanel'
 import type { EditOptions } from './fields'
 import Sections from './Sections'
 import { useIntegrationForm } from './useIntegrationForm'
+import FrameworkPanel from '../framework/FrameworkPanel'
 
 const OPTION_PAGE_SIZE = 200
 
@@ -123,6 +124,13 @@ function LoadedDetail({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [auditRefresh, setAuditRefresh] = useState(0)
+  const [frameworkDirty, setFrameworkDirty] = useState(false)
+  const [frameworkEditing, setFrameworkEditing] = useState(false)
+  const refreshFrameworkParent = useCallback(async () => {
+    setAuditRefresh(n => n + 1)
+    try { onDetail(await getIntegration(detail.id)) }
+    catch { toast('Framework saved, but catalog metadata could not refresh. Reload before editing approvals.', 'error') }
+  }, [detail.id, onDetail, toast])
   // Lets programmatic navigation (post-delete) bypass the dirty-form blocker.
   const skipBlockRef = useRef(false)
 
@@ -171,21 +179,21 @@ function LoadedDetail({
 
   // Guard client-side navigation away from a dirty edit form.
   const shouldBlock = useCallback(
-    () => editing && form.dirty && !skipBlockRef.current,
-    [editing, form.dirty],
+    () => ((editing && form.dirty) || frameworkDirty) && !skipBlockRef.current,
+    [editing, form.dirty, frameworkDirty],
   )
   const blocker = useBlocker(shouldBlock)
 
   // Guard full page unloads (refresh, tab close) too.
   useEffect(() => {
-    if (!(editing && form.dirty)) return
+    if (!(editing && form.dirty) && !frameworkDirty) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [editing, form.dirty])
+  }, [editing, form.dirty, frameworkDirty])
 
   async function save() {
     setSaving(true)
@@ -258,12 +266,12 @@ function LoadedDetail({
           View DAG
         </Link>
         {!editing && (
-          <button type="button" className="btn" onClick={() => setEditing(true)}>
+          <button type="button" className="btn" disabled={frameworkEditing} onClick={() => setEditing(true)}>
             Edit
           </button>
         )}
         {isAdmin && (
-          <button type="button" className="btn danger" onClick={() => setConfirmDelete(true)}>
+          <button type="button" className="btn danger" disabled={frameworkEditing} onClick={() => setConfirmDelete(true)}>
             Delete
           </button>
         )}
@@ -274,6 +282,9 @@ function LoadedDetail({
         {formatDateTime(detail.updated_at)} by {detail.updated_by ?? '—'} · Version {detail.version}
       </p>
 
+      <FrameworkPanel integrationId={detail.id} onDirtyChange={setFrameworkDirty} onEditingChange={setFrameworkEditing} onUpdated={refreshFrameworkParent} writesLocked={editing} refreshKey={detail.version} />
+
+      <h2>Catalog metadata & approvals</h2>
       {editing && optionsError && (
         <div className="error-note" role="alert">
           Could not load editing options: {optionsError}
@@ -379,3 +390,4 @@ function LoadedDetail({
     </>
   )
 }
+

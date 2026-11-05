@@ -8,10 +8,10 @@ export default function Header() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <NavLink to="/" aria-label="Home">
-        <img className="logo" src="/logo.svg" alt="Tri-State" />
+      <NavLink to="/" className="brand-home" aria-label="Integration Dictionary home">
+        <img className="logo" src="/logo.svg" alt="" />
+        <span className="brand-copy"><span className="brand-organization">Platte River Power Authority</span><span className="app-title">Integration Dictionary</span></span>
       </NavLink>
-      <span className="app-title">Integration Dictionary</span>
       <nav aria-label="Primary">
         <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
           Integrations
@@ -32,3 +32,4 @@ export default function Header() {
     </header>
   )
 }
+

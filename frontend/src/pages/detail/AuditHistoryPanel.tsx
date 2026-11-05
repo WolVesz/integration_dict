@@ -34,12 +34,23 @@ function groupEntries(items: AuditEntry[]): Group[] {
   return groups
 }
 
-const gridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '180px 1fr',
-  gap: '2px 12px',
-  fontSize: '12.5px',
-  marginTop: 4,
+function readableSnapshot(raw: string | null): string {
+  if (raw === null || raw === 'null') return 'No value recorded.'
+  try { return JSON.stringify(JSON.parse(raw), null, 2) }
+  catch { return raw }
+}
+
+function AuditChange({ entry }: { entry: AuditEntry }) {
+  const large = entry.field?.startsWith('framework.') ||
+    (entry.old_value?.length ?? 0) > 300 || (entry.new_value?.length ?? 0) > 300
+  if (!large) return <span>{entry.old_value ?? EM_DASH} → {entry.new_value ?? EM_DASH}</span>
+  return <details className="audit-change">
+    <summary>View before and after snapshots</summary>
+    <div className="audit-snapshots">
+      <section aria-label="Before change"><h3>Before change</h3><pre>{readableSnapshot(entry.old_value)}</pre></section>
+      <section aria-label="After change"><h3>After change</h3><pre>{readableSnapshot(entry.new_value)}</pre></section>
+    </div>
+  </details>
 }
 
 function SnapshotGrid({ raw }: { raw: string | null }) {
@@ -56,11 +67,11 @@ function SnapshotGrid({ raw }: { raw: string | null }) {
   const pairs = Object.entries(snap).filter(([, v]) => v !== null && v !== undefined && v !== '')
   if (pairs.length === 0) return <span className="muted">{EM_DASH}</span>
   return (
-    <div style={gridStyle}>
+    <div className="audit-grid">
       {pairs.map(([key, value]) => (
         <Fragment key={key}>
           <span className="muted">{auditFieldLabel(key)}</span>
-          <span>{Array.isArray(value) ? value.map(String).join(', ') : String(value)}</span>
+          <span>{typeof value === 'object' ? <pre className="audit-value">{JSON.stringify(value, null, 2)}</pre> : String(value)}</span>
         </Fragment>
       ))}
     </div>
@@ -94,15 +105,13 @@ function GroupBlock({ group }: { group: Group }) {
       ) : isSnapshot ? (
         <SnapshotGrid raw={first.action === 'created' ? first.new_value : first.old_value} />
       ) : (
-        <div style={gridStyle}>
+        <div className="audit-grid">
           {group.entries
             .filter((e) => e.field !== null)
             .map((e) => (
               <Fragment key={e.id}>
                 <span className="muted">{auditFieldLabel(e.field ?? '')}</span>
-                <span>
-                  {e.old_value ?? EM_DASH} → {e.new_value ?? EM_DASH}
-                </span>
+                <AuditChange entry={e} />
               </Fragment>
             ))}
         </div>
@@ -144,7 +153,7 @@ export default function AuditHistoryPanel({ integrationId, refreshKey = 0 }: Aud
   const groups = data ? groupEntries(data.items) : []
 
   return (
-    <section className="card" style={{ marginTop: 16 }}>
+    <section className="card audit-panel" style={{ marginTop: 16 }}>
       <h2>Audit history</h2>
       {error ? (
         <div className="error-note" role="alert">
@@ -174,3 +183,4 @@ export default function AuditHistoryPanel({ integrationId, refreshKey = 0 }: Aud
     </section>
   )
 }
+

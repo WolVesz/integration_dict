@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 
 from .auth import CurrentUser, get_current_user
 from .config import get_settings
@@ -18,10 +19,19 @@ from .database import engine
 from .models import Base
 from .routers import audit as audit_routes
 from .routers import comments as comment_routes
+from .routers import framework as framework_routes
+from .routers import readiness as readiness_routes
 from .routers import integrations as integration_routes
 from .routers import lookups as lookup_routes
 from .routers import search as search_routes
 from .schemas import ADMIN_ONLY_FIELDS, MeOut, UserOut
+
+
+def _current_schema(connection):
+    schema = connection.scalar(text("SELECT current_schema()"))
+    if not schema:
+        raise RuntimeError("PostgreSQL current_schema() is empty; configure an explicit accessible schema.")
+    return schema
 
 
 @asynccontextmanager
@@ -29,16 +39,37 @@ async def lifespan(app: FastAPI):
     # DEV_MODE fakes identity and grants admin to every request; never let it
     # run on Databricks Apps (markers injected by the platform). Guards against
     # a stray .env being swept into the deploy.
-    if get_settings().dev_mode and (os.getenv("DATABRICKS_APP_PORT") or os.getenv("DATABRICKS_CLIENT_ID")):
+    on_databricks = bool(os.getenv("DATABRICKS_APP_PORT") or os.getenv("DATABRICKS_CLIENT_ID"))
+    if get_settings().dev_mode and on_databricks:
         raise RuntimeError(
             "DEV_MODE is enabled but Databricks Apps environment was detected. "
             "Remove DEV_MODE from the deployed configuration — it disables authentication."
         )
-    Base.metadata.create_all(bind=engine)
+    if on_databricks:
+        if engine.dialect.name != "postgresql":
+            raise RuntimeError(
+                "Databricks Apps requires a persistent PostgreSQL/Lakebase database. "
+                "Configure LAKEBASE_INSTANCE_NAME and the database resource; SQLite fallback is forbidden."
+            )
+        # Production startup must never mutate schema or silently initialize an
+        # empty database. Bootstrap/upgrade explicitly after backup and review.
+        with engine.connect() as connection:
+            inspector = inspect(connection)
+            schema = _current_schema(connection)
+            for name, table in Base.metadata.tables.items():
+                if not inspector.has_table(name, schema=schema) or set(table.columns.keys()) - {
+                    column['name'] for column in inspector.get_columns(name, schema=schema)
+                }:
+                    raise RuntimeError(
+                        "Database schema is incomplete. Run the documented baseline bootstrap for a new install "
+                        "or scripts/migrate_framework.py for an existing installation before deploying."
+                    )
+    else:
+        Base.metadata.create_all(bind=engine)
     yield
 
 
-app = FastAPI(title="Integration Dictionary", lifespan=lifespan)
+app = FastAPI(title="Platte River Power Authority Integration Dictionary", version="2.0.0", lifespan=lifespan)
 
 if get_settings().dev_mode:
     app.add_middleware(
@@ -54,6 +85,8 @@ app.include_router(lookup_routes.router, prefix="/api")
 app.include_router(audit_routes.router, prefix="/api")
 app.include_router(search_routes.router, prefix="/api")
 app.include_router(comment_routes.router, prefix="/api")
+app.include_router(framework_routes.router, prefix="/api")
+app.include_router(readiness_routes.router)
 
 
 @app.get("/api/me", response_model=MeOut)
@@ -87,3 +120,4 @@ if _DIST.is_dir():
         if full_path and candidate.is_file() and candidate.is_relative_to(_DIST):
             return FileResponse(candidate)
         return FileResponse(_DIST / "index.html", headers={"Cache-Control": "no-cache"})
+
